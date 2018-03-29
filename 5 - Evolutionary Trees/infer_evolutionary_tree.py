@@ -570,7 +570,6 @@ def is_valid_bst_help(tree, infix_list):
 from Bio import Phylo
 from cStringIO import StringIO
 import uuid
-import FullBiTree
 
 
 def process_clade(clade, taxon_name_key, seen_names):
@@ -607,14 +606,14 @@ def process_clade(clade, taxon_name_key, seen_names):
 
     if len(clade.clades) == 0:
         # This is a leaf node
-        tree = FullBiTree.FullBiTree(clade.name)
+        tree = FullBiTree(clade.name)
         tree.set_node_property(taxon_name_key, clade.name)
         return tree
     else:
         # This is an internal node
         left  = process_clade(clade.clades[0], taxon_name_key, seen_names)
         right = process_clade(clade.clades[1], taxon_name_key, seen_names)
-        tree = FullBiTree.FullBiTree(clade.name, left, right)
+        tree = FullBiTree(clade.name, left, right)
         return tree
 
 
@@ -634,19 +633,51 @@ def parse_newick(newickstr, taxon_name_key):
     tree = Phylo.read(StringIO(newickstr), "newick")
     return process_clade(tree.root, taxon_name_key, seen_names)
 
-newickstr = 'ABCD'
-taxon = 'test'
-print parse_newick(newickstr, tax)
+# print parse_newick('(A,B)', 'taxon')
+
+def read_phylip(filename):
+    """
+    Read a file in Phylip format and return the length of the
+    sequences and the taxa and sequences.
+
+    Arguments:
+    filename -- name of file in Phylip format
+
+    Returns:
+    A tuple where the first element is the length of the sequences and
+    the second argument is a dictionary mapping taxa to sequences.
+    """
+    # Initialize return values in case file is bogus
+    m = 0
+    tsmap = {}
+
+    with open(filename) as f:
+        # First line contains n and m separated by a space
+        nm = f.readline()
+        nm = nm.split()
+        n = int(nm[0])
+        m = int(nm[1])
+
+        # Subsequent lines contain taxon and sequence separated by a space
+        for i in range(n):
+            l = f.readline()
+            l = l.split()
+            tsmap[l[0]] = l[1]
+
+    # Return sequence length and mapping of taxa to sequences
+    return m, tsmap
+
+print read_phylip('primate_seqs.phylip')
 
 #####################  STUDENT CODE BELOW THIS LINE  #####################
 # Test tree
-# A = FullBiTree('A')
-# B = FullBiTree('B')
-# C = FullBiTree('C')
-# D = FullBiTree('D')
-# E = FullBiTree('E', A, B)
-# F = FullBiTree('F', C, D)
-# G = FullBiTree('G', E, F)
+A = FullBiTree('A')
+B = FullBiTree('B')
+C = FullBiTree('C')
+D = FullBiTree('D')
+E = FullBiTree('E', A, B)
+F = FullBiTree('F', C, D)
+G = FullBiTree('G', E, F)
 
 
 def write_newick(t):
@@ -729,6 +760,7 @@ def compute_nni_neighborhood(t):
 
     return nni
 
+
 def tree_switch_node(t, node1, node2):
     """
     :param t: tree
@@ -768,11 +800,224 @@ def tree_switch_node(t, node1, node2):
 #     print nni
 
 def random_tree(sequences):
-    pass
+    taxas = sequences.keys()
+    node_num = len(taxas) - 1
+
+    # initialize tree with one node
+    start = taxas.pop(random.randrange(len(taxas)))
+    # print start
+    tree = FullBiTree(start)
+    tree.set_node_property('taxon', start)
+    tree.set_node_property('sequence', sequences[start])
+
+    while taxas:
+        prob = random.uniform(0, 1)
+
+        # create leaf out of random taxa
+        rand_taxa = taxas.pop(random.randrange(len(taxas)))
+        tree_a = FullBiTree(rand_taxa)
+        tree_a.set_node_property('taxon', rand_taxa)
+        tree_a.set_node_property('sequence', sequences[rand_taxa])
+
+        # add a pair of leaves to tree
+        if prob >= 0.5 and len(taxas) >= 2:
+            rand_taxa = taxas.pop(random.randrange(len(taxas)))
+            tree_b = FullBiTree(rand_taxa)
+            tree_b.set_node_property('taxon', rand_taxa)
+            tree_b.set_node_property('sequence', sequences[rand_taxa])
+            tree_ab = FullBiTree(node_num, tree_a, tree_b)
+            node_num -= 1
+            tree = FullBiTree(node_num, tree_ab, tree)
+            node_num -= 1
+
+        # add one leaf to tree
+        else:
+            tree = FullBiTree(node_num, tree_a, tree)
+            node_num -= 1
+
+    return tree
+
+# primate = read_phylip('primate_seqs.phylip')[1]
+# print random_tree(primate)
+
+
+def bottom_up_ps(tree, sequence_key, set_dict):
+    """
+    :param tree: DNA tree
+    :param sequence_key: key to dna sequence
+    :param set_dict: dictionary of node name to list of dna sets
+    :return: nothing, just modifies the set_dict
+    """
+    if tree.is_leaf():
+        dna = tree.get_node_property(sequence_key)
+        for idx in range(len(dna)):
+            set_dict[tree.get_name()].append(set(dna[idx]))
+
+    else:
+        bottom_up_ps(tree.get_left_child(), sequence_key, set_dict)
+        bottom_up_ps(tree.get_right_child(), sequence_key, set_dict)
+        left_child_sets = set_dict[tree.get_left_child().get_name()]
+        right_child_sets = set_dict[tree.get_right_child().get_name()]
+
+        for idx in range(len(left_child_sets)):
+            if left_child_sets[idx].intersection(right_child_sets[idx]):
+                set_dict[tree.get_name()].append(left_child_sets[idx].intersection(right_child_sets[idx]))
+
+            else:
+                set_dict[tree.get_name()].append(left_child_sets[idx].union(right_child_sets[idx]))
+
+
+def top_down_ps(tree, sequence_key, set_dict, m):
+    """
+    :param tree: DNA tree
+    :param sequence_key: key to DNA sequence
+    :param set_dict: dictionary of node name to list of dna sets
+    :param m: length of DNA sequence
+    :return: modifies tree by adding sequences to all internal nodes
+    """
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        if not node.get_left_child().is_leaf():
+            left_child = node.get_left_child()
+            right_child = node.get_right_child()
+
+            dna = node.get_node_property(sequence_key)
+
+            # calculates the dna sequence of the left child
+            left_dna = ''
+            left_sets = set_dict[left_child.get_name()]
+            for idx in range(m):
+                if dna[idx] in left_sets[idx]:
+                    left_dna += dna[idx]
+
+                else:
+                    random_dna = list(left_sets[idx]).pop(random.randrange(len(left_sets[idx]))) # pop random value
+                    left_dna += random_dna
+
+            left_child.set_node_property(sequence_key, left_dna)
+
+            # calculates the dna sequence of the right child
+            right_dna = ''
+            right_sets = set_dict[right_child.get_name()]
+            for idx in range(m):
+                if dna[idx] in right_sets[idx]:
+                    right_dna += dna[idx]
+
+                else:
+                    random_dna = list(right_sets[idx]).pop(random.randrange(len(right_sets[idx])))  # pop random value
+                    right_dna += random_dna
+
+            right_child.set_node_property(sequence_key, right_dna)
+
+            node.set_children(left_child, right_child)
+            stack.append(left_child)
+            stack.append(right_child)
+
+
+def tree_sequence_dict(tree, dna_dict, sequence_key):
+    dna_dict[tree.get_name()] = tree.get_node_property(sequence_key)
+    if not tree.is_leaf():
+        tree_sequence_dict(tree.get_left_child(), dna_dict, sequence_key)
+        tree_sequence_dict(tree.get_right_child(), dna_dict, sequence_key)
+
+
+def compute_genetic_distance(genome_a, genome_b):
+    """
+    :param genome_a: sequence of genome for patient A
+    :param genome_b: sequence of genome for patient B
+    :return: the hamming distance
+    """
+    hamming_dist = 0
+
+    # calculate number of different genomes
+    for idx in range(len(genome_a)):
+        if genome_a[idx] != genome_b[idx]:
+            hamming_dist += 1
+
+    return hamming_dist
+
+
+def calculate_ps(dna_dict):
+    ps_score = 0
+    nodes = dna_dict.keys()
+
+    while len(nodes) > 1:
+        curr_node = nodes.pop(random.randrange(len(nodes)))
+
+        for other_node in nodes:
+            ps_score += compute_genetic_distance(dna_dict[curr_node], dna_dict[other_node])
+
+    return ps_score
+
 
 def compute_ps(tree, sequence_key, m):
-    pass
+    set_dict = defaultdict(list)
+
+    # modify set_dict to contain information about internal nodes
+    bottom_up_ps(tree, sequence_key, set_dict)
+
+    # set dna sequence of root node
+    dna = ''
+    for dna_set in set_dict[tree.get_name()]:
+        dna += random.choice(list(dna_set))
+
+    tree.set_node_property(sequence_key, dna)
+
+    # set dna sequence for internal nodes
+    top_down_ps(tree, sequence_key, set_dict, m)
+
+    # compute PS score
+    dna_dict = dict()
+    tree_sequence_dict(tree, dna_dict, sequence_key)  # modifies dna dict to have node name to dna sequence
+
+    return calculate_ps(dna_dict)
+
+
+# A = FullBiTree('A')
+# A.set_node_property('sequence', 'GGTA')
+# B = FullBiTree('B')
+# B.set_node_property('sequence', 'ACGT')
+# C = FullBiTree('C')
+# C.set_node_property('sequence', 'ACTG')
+# D = FullBiTree('D')
+# D.set_node_property('sequence', 'CATA')
+# E = FullBiTree('E', A, B)
+# F = FullBiTree('F', C, D)
+# G = FullBiTree('G', E, F)
+# print compute_ps(G, 'sequence', 4)
+
+primate = read_phylip('primate_seqs.phylip')[1]
+len_m = len(primate[random.choice(primate.keys())])
+print compute_ps(random_tree(primate), 'sequence', len_m)
 
 
 def infer_evolutionary_tree(seqfile, outfile, numrestarts):
-    pass
+    sequences = read_phylip(seqfile)[1]
+    tree = random_tree(sequences)
+    m = len(sequences[random.choice(sequences.keys())])
+    ps = compute_ps(tree, 'sequence', m)
+
+    while numrestarts > 0:
+        nni_set = compute_nni_neighborhood(tree)
+        score_dict = dict()
+
+        # finds ps scores of nni neighbors
+        for nni in nni_set:
+            score = compute_ps(nni, 'sequence', m)
+            score_dict[score] = nni
+
+        max_score = max(score_dict.keys())
+
+        if max_score > ps:
+            ps = max_score
+            tree = score_dict[max_score]
+
+        else:
+            tree = random_tree(sequences)
+            ps = compute_ps(tree, 'sequence', m)
+            numrestarts -= 1
+
+    return ps
+
+# print infer_evolutionary_tree('primate_seqs.phylip', 'test', 5)
