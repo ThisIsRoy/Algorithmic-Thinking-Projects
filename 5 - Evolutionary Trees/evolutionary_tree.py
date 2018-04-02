@@ -667,14 +667,35 @@ def read_phylip(filename):
     # Return sequence length and mapping of taxa to sequences
     return m, tsmap
 
-print read_phylip('primate_seqs.phylip')
+# print read_phylip('primate_seqs.phylip')
+
+
+def write_graph(newick, filename):
+    """
+    Write a graph to a file.  The file will be in a format that can be
+    read by the read_graph function.
+
+    Arguments:
+    g        -- a graph
+    filename -- name of the file to store the graph
+
+    Returns:
+    None
+    """
+    with open(filename, 'w') as f:
+        f.write(newick)
+
 
 #####################  STUDENT CODE BELOW THIS LINE  #####################
 # Test tree
 A = FullBiTree('A')
+A.set_node_property('sequence', 'ACGAGT')
 B = FullBiTree('B')
+B.set_node_property('sequence', 'CCCGAT')
 C = FullBiTree('C')
+C.set_node_property('sequence', 'TGCAAT')
 D = FullBiTree('D')
+D.set_node_property('sequence', 'CTGGAC')
 E = FullBiTree('E', A, B)
 F = FullBiTree('F', C, D)
 G = FullBiTree('G', E, F)
@@ -686,7 +707,8 @@ def write_newick(t):
     :return: newick sequence
     """
     if t.is_leaf():
-        return t.get_name()
+        # return t.get_name()
+        return t.get_node_property('taxon')
 
     else:
         return '(' + write_newick(t.get_left_child()) + ',' + write_newick(t.get_right_child()) + ')'
@@ -713,50 +735,34 @@ def compute_nni_neighborhood(t):
             parent[left_child.get_name()] = node
             parent[right_child.get_name()] = node
 
+            # add children to stack
+            stack.append(left_child)
+            stack.append(right_child)
+
             # find other child of parent
             parent_node = parent[node.get_name()]
 
             if parent_node.get_left_child().get_name() != node.get_name():
                 step = parent_node.get_left_child()
+            elif parent_node.get_right_child().get_name() != node.get_name():
+                step = parent_node.get_right_child()
             else:
-                step = parent_node.get_left_child()
+                print 'error in finding parent'
 
             # create NNI by switching child1 and step
-            t_copy = deepcopy(t)
             step_copy = deepcopy(step)
+            step_copy2 = deepcopy(step)
             left_copy = deepcopy(left_child)
             right_copy = deepcopy(right_child)
-
-            # # find the children of step node if exists
-            # if not step_copy.is_leaf():
-            #     step_copy_child1 = step_copy.get_left_child()
-            #     step_copy_child2 = step_copy.get_right_child()
-            #     step_copy.remove_children()
-            # else:
-            #     step_copy_child1 = None
-            #     step_copy_child2 = None
-            #
-
-            #
-            # # find the children of the left child if it exists
-            # if not left_copy.is_leaf():
-            #     left_copy_child1 = left_copy.get_left_child()
-            #     left_copy_child2 = left_copy.get_right_child()
-            #     left_copy.remove_children()
-            # else:
-            #     left_copy_child1 = None
-            #     left_copy_child2 = None
-            #
-            # # add the nodes to the
-            # if left_copy_child1:
-            #     step_copy.set_children(left_copy_child1, left_copy_child2)
-            #
-            # if step_copy_child1:
-            #     left_copy.set_children(step_copy_child1, step_copy_child2)
-
-            nni.add(tree_switch_node(t_copy, left_copy, step_copy))
             t_copy = deepcopy(t)
-            nni.add(tree_switch_node(t_copy, right_copy, step_copy))
+            t_copy2 = deepcopy(t)
+
+            # add trees to set
+            # print left_copy, 'left copy'
+            # print right_copy, 'right copy'
+            # print step, 'step'
+            nni.add(tree_switch_node(t_copy, left_copy, step_copy))
+            nni.add(tree_switch_node(t_copy2, right_copy, step_copy2))
 
     return nni
 
@@ -779,25 +785,25 @@ def tree_switch_node(t, node1, node2):
         return t
 
     else:
-        left_child = t.get_left_child()
-        right_child = t.get_right_child()
-        t.remove_children()
-        t.set_children(tree_switch_node(left_child, node1, node2), tree_switch_node(right_child, node1, node2))
+        t.set_children(tree_switch_node(t.get_left_child(), node1, node2), tree_switch_node(t.get_right_child(), node1, node2))
         return t
 
-# A3 = FullBiTree('A3')
-# B3 = FullBiTree('B3')
-# C3 = FullBiTree('C3')
-# D3 = FullBiTree('D3', B3, C3)
-# E3 = FullBiTree('E3', A3, D3)
-# D3_switch = FullBiTree('D3')
-# A3_switch = FullBiTree('A3', B3, C3)
+Y3 = FullBiTree('Y3')
+Z3 = FullBiTree('Z3')
+A3 = FullBiTree('A3')
+B3 = FullBiTree('B3', Y3, Z3)
+C3 = FullBiTree('C3')
+D3 = FullBiTree('D3', B3, C3)
+E3 = FullBiTree('E3', A3, D3)
+D3_switch = FullBiTree('D3')
+A3_switch = FullBiTree('A3', B3, C3)
 
 # switched = tree_switch_node(E3, D3_switch, A3_switch)
 # print switched
-# nni_set = compute_nni_neighborhood(G)
+# nni_set = compute_nni_neighborhood(E3)
 # for nni in nni_set:
 #     print nni
+# print len(nni_set)
 
 def random_tree(sequences):
     taxas = sequences.keys()
@@ -840,6 +846,11 @@ def random_tree(sequences):
 # primate = read_phylip('primate_seqs.phylip')[1]
 # print random_tree(primate)
 
+# sequences = read_phylip('primate_seqs.phylip')[1]
+# tree = random_tree(sequences)
+# print tree
+# print compute_nni_neighborhood(tree)
+
 
 def bottom_up_ps(tree, sequence_key, set_dict):
     """
@@ -849,16 +860,19 @@ def bottom_up_ps(tree, sequence_key, set_dict):
     :return: nothing, just modifies the set_dict
     """
     if tree.is_leaf():
+        # if tree is leaf add each dna to sets
         dna = tree.get_node_property(sequence_key)
         for idx in range(len(dna)):
             set_dict[tree.get_name()].append(set(dna[idx]))
 
     else:
+        # if tree is internal node recursively find the sequences for children
         bottom_up_ps(tree.get_left_child(), sequence_key, set_dict)
         bottom_up_ps(tree.get_right_child(), sequence_key, set_dict)
         left_child_sets = set_dict[tree.get_left_child().get_name()]
         right_child_sets = set_dict[tree.get_right_child().get_name()]
 
+        #
         for idx in range(len(left_child_sets)):
             if left_child_sets[idx].intersection(right_child_sets[idx]):
                 set_dict[tree.get_name()].append(left_child_sets[idx].intersection(right_child_sets[idx]))
@@ -867,56 +881,49 @@ def bottom_up_ps(tree, sequence_key, set_dict):
                 set_dict[tree.get_name()].append(left_child_sets[idx].union(right_child_sets[idx]))
 
 
-def top_down_ps(tree, sequence_key, set_dict, m):
+def top_down_ps(tree, sequence_key, set_dict, m, parent_dna):
     """
     :param tree: DNA tree
     :param sequence_key: key to DNA sequence
     :param set_dict: dictionary of node name to list of dna sets
     :param m: length of DNA sequence
+    :param parent_dna: DNA sequence of parent node
     :return: modifies tree by adding sequences to all internal nodes
     """
-    stack = [tree]
-    while stack:
-        node = stack.pop()
-        if not node.get_left_child().is_leaf():
-            left_child = node.get_left_child()
-            right_child = node.get_right_child()
+    # base case
+    if tree.is_leaf():
+        return tree
 
-            dna = node.get_node_property(sequence_key)
+    else:
+        # calculates the dna sequence of the left child
+        dna = ''
+        dna_sets = set_dict[tree.get_name()]
+        for idx in range(m):
+            if parent_dna[idx] in dna_sets[idx]:
+                dna += parent_dna[idx]
 
-            # calculates the dna sequence of the left child
-            left_dna = ''
-            left_sets = set_dict[left_child.get_name()]
-            for idx in range(m):
-                if dna[idx] in left_sets[idx]:
-                    left_dna += dna[idx]
+            else:
+                random_dna = list(dna_sets[idx]).pop(random.randrange(len(dna_sets[idx])))  # pop random value
+                dna += random_dna
+        # set property and call recursion
+        tree.set_node_property(sequence_key, dna)
+        # print 'node name', tree.get_name()
+        # print tree.get_node_property('sequence')
+        tree.set_children(top_down_ps(tree.get_left_child(), sequence_key, set_dict, m, dna), top_down_ps(tree.get_right_child(), sequence_key, set_dict, m, dna))
 
-                else:
-                    random_dna = list(left_sets[idx]).pop(random.randrange(len(left_sets[idx]))) # pop random value
-                    left_dna += random_dna
-
-            left_child.set_node_property(sequence_key, left_dna)
-
-            # calculates the dna sequence of the right child
-            right_dna = ''
-            right_sets = set_dict[right_child.get_name()]
-            for idx in range(m):
-                if dna[idx] in right_sets[idx]:
-                    right_dna += dna[idx]
-
-                else:
-                    random_dna = list(right_sets[idx]).pop(random.randrange(len(right_sets[idx])))  # pop random value
-                    right_dna += random_dna
-
-            right_child.set_node_property(sequence_key, right_dna)
-
-            node.set_children(left_child, right_child)
-            stack.append(left_child)
-            stack.append(right_child)
+        return tree
 
 
 def tree_sequence_dict(tree, dna_dict, sequence_key):
+    """
+    :param tree: DNA tree
+    :param dna_dict: dictionary of node to DNA sequence
+    :param sequence_key: key to access DNA sequence
+    :return: fills out dna dictionary
+    """
     dna_dict[tree.get_name()] = tree.get_node_property(sequence_key)
+
+    # recursively fills out dna dictionary with all nodes
     if not tree.is_leaf():
         tree_sequence_dict(tree.get_left_child(), dna_dict, sequence_key)
         tree_sequence_dict(tree.get_right_child(), dna_dict, sequence_key)
@@ -938,86 +945,201 @@ def compute_genetic_distance(genome_a, genome_b):
     return hamming_dist
 
 
-def calculate_ps(dna_dict):
+def calculate_ps(tree, sequence_key):
+    """
+    :param dna_dict: dictionary of node names to dna sequence
+    :return: parsimony score
+    """
     ps_score = 0
-    nodes = dna_dict.keys()
 
-    while len(nodes) > 1:
-        curr_node = nodes.pop(random.randrange(len(nodes)))
+    stack = [tree]
 
-        for other_node in nodes:
-            ps_score += compute_genetic_distance(dna_dict[curr_node], dna_dict[other_node])
+    while stack:
+        node = stack.pop()
+
+        if not node.is_leaf():
+            stack.append(node.get_left_child())
+            stack.append(node.get_right_child())
+
+            ps_score += compute_genetic_distance(node.get_node_property(sequence_key), node.get_left_child().get_node_property(sequence_key))
+            ps_score += compute_genetic_distance(node.get_node_property(sequence_key), node.get_right_child().get_node_property(sequence_key))
 
     return ps_score
 
 
 def compute_ps(tree, sequence_key, m):
+    """
+    :param tree: DNA tree
+    :param sequence_key: key to access dna sequence
+    :param m: length of dna sequence
+    :return: calculate parsimony score of tree
+    """
     set_dict = defaultdict(list)
 
     # modify set_dict to contain information about internal nodes
     bottom_up_ps(tree, sequence_key, set_dict)
+    # print 'set dict', set_dict
 
     # set dna sequence of root node
     dna = ''
     for dna_set in set_dict[tree.get_name()]:
         dna += random.choice(list(dna_set))
 
+    # modifies each internal node property in tree
     tree.set_node_property(sequence_key, dna)
 
     # set dna sequence for internal nodes
-    top_down_ps(tree, sequence_key, set_dict, m)
+    tree = top_down_ps(tree, sequence_key, set_dict, m, tree.get_node_property(sequence_key))
 
     # compute PS score
     dna_dict = dict()
     tree_sequence_dict(tree, dna_dict, sequence_key)  # modifies dna dict to have node name to dna sequence
 
-    return calculate_ps(dna_dict)
+    return calculate_ps(tree, sequence_key)
 
+
+# primate = read_phylip('primate_seqs.phylip')[1]
+# len_m = len(primate[random.choice(primate.keys())])
+# print compute_ps(random_tree(primate), 'sequence', len_m)
+
+# B = FullBiTree("B")
+# B.set_node_property("sequence", "AGCT")
+# D = FullBiTree("D")
+# D.set_node_property("sequence", "AAGC")
+# E = FullBiTree("E")
+# E.set_node_property("sequence", "TGCC")
+# C = FullBiTree("C", D, E)
+# A = FullBiTree("A", B, C)
+# print compute_ps(A, 'sequence', 4)
 
 # A = FullBiTree('A')
-# A.set_node_property('sequence', 'GGTA')
+# A.set_node_property('sequence', 'ACGAGT')
 # B = FullBiTree('B')
-# B.set_node_property('sequence', 'ACGT')
+# B.set_node_property('sequence', 'CCCGAT')
 # C = FullBiTree('C')
-# C.set_node_property('sequence', 'ACTG')
+# C.set_node_property('sequence', 'TGCAAT')
 # D = FullBiTree('D')
-# D.set_node_property('sequence', 'CATA')
+# D.set_node_property('sequence', 'CTGGAC')
 # E = FullBiTree('E', A, B)
 # F = FullBiTree('F', C, D)
 # G = FullBiTree('G', E, F)
-# print compute_ps(G, 'sequence', 4)
+# print compute_ps(G, 'sequence', 6)
 
-primate = read_phylip('primate_seqs.phylip')[1]
-len_m = len(primate[random.choice(primate.keys())])
-print compute_ps(random_tree(primate), 'sequence', len_m)
+
+# def infer_evolutionary_tree(seqfile, outfile, numrestarts):
+#     """
+#     :param seqfile: name of input sequence file
+#     :param outfile: name of output file
+#     :param numrestarts: number of restarts in iterative improvement
+#     :return: saves graph to output file
+#     """
+#     sequences = read_phylip(seqfile)[1]
+#     tree = random_tree(sequences)
+#     m = len(sequences[random.choice(sequences.keys())])
+#     ps = compute_ps(tree, 'sequence', m)
+#
+#     while numrestarts:
+#         nni_set = compute_nni_neighborhood(tree)
+#         score_dict = dict()
+#
+#         # finds ps scores of nni neighbors
+#         for nni in nni_set:
+#             score = compute_ps(nni, 'sequence', m)
+#             score_dict[score] = nni
+#
+#         min_score = min(score_dict.keys())
+#
+#         if min_score <= ps:
+#             if min_score == ps:
+#                 numrestarts -= 1
+#
+#             ps = min_score
+#             tree = score_dict[min_score]
+#
+#         else:
+#             tree = random_tree(sequences)
+#             # ps = compute_ps(tree, 'sequence', m)
+#             numrestarts -= 1
+#
+#         print ps
+#
+#     write_graph(write_newick(tree), outfile)
+#
+#     return ps
+
+
+def compute_local_min(tree, sequence_key, m):
+    """
+    :param tree: evolutionary tree
+    :param sequence_key: key to access dna sequence
+    :param m: length of dna sequence
+    :return: minimum ps score of the tree's nni neighbors, corresponding tree
+    """
+    nni_set = compute_nni_neighborhood(tree)
+    score_dict = dict()
+
+    for nni in nni_set:
+        score_dict[compute_ps(nni, sequence_key, m)] = nni
+
+    min_score = min(score_dict.keys())
+    return min_score, score_dict[min_score]
+
+
+def compute_local_min(tree, sequence_key, m):
+    """
+    :param tree: evolutionary tree
+    :param sequence_key: key to access dna sequence
+    :param m: length of dna sequence
+    :return: minimum ps score of the tree's nni neighbors, corresponding tree
+    """
+    nni_set = compute_nni_neighborhood(tree)
+    score_dict = dict()
+
+    for nni in nni_set:
+        score_dict[compute_ps(nni, sequence_key, m)] = nni
+
+    min_score = min(score_dict.keys())
+    return min_score, score_dict[min_score]
 
 
 def infer_evolutionary_tree(seqfile, outfile, numrestarts):
+    """
+    :param seqfile: name of input sequence file
+    :param outfile: name of output file
+    :param numrestarts: number of restarts in iterative improvement
+    :return: average runs per restart
+    """
+    # import files
     sequences = read_phylip(seqfile)[1]
-    tree = random_tree(sequences)
+
+    # initialize first tree and ps
+
     m = len(sequences[random.choice(sequences.keys())])
-    ps = compute_ps(tree, 'sequence', m)
+    global_ps = float('inf')
 
-    while numrestarts > 0:
-        nni_set = compute_nni_neighborhood(tree)
-        score_dict = dict()
+    # looks for local min through random restarts
+    for restart in range(numrestarts):
+        # initialize random tree and scoring
+        tree = random_tree(sequences)
+        tree_ps = compute_ps(tree, 'sequence', m)
+        neighbor_ps, tree = compute_local_min(tree, 'sequence', m)
 
-        # finds ps scores of nni neighbors
-        for nni in nni_set:
-            score = compute_ps(nni, 'sequence', m)
-            score_dict[score] = nni
+        # keep looking until local min is found
+        while neighbor_ps < tree_ps:
+            tree_ps = neighbor_ps
+            neighbor_ps, tree = compute_local_min(tree, 'sequence', m)
 
-        max_score = max(score_dict.keys())
+        # check local min against global min
+        if neighbor_ps < global_ps:
+            global_ps = neighbor_ps
 
-        if max_score > ps:
-            ps = max_score
-            tree = score_dict[max_score]
+        print global_ps
 
-        else:
-            tree = random_tree(sequences)
-            ps = compute_ps(tree, 'sequence', m)
-            numrestarts -= 1
+    write_graph(write_newick(tree), outfile)
 
-    return ps
+    return global_ps
 
-# print infer_evolutionary_tree('primate_seqs.phylip', 'test', 5)
+
+# print infer_evolutionary_tree('primate_seqs.phylip', 'newick.txt', 50)
+# print infer_evolutionary_tree('yeast_gene1_seqs.phylip', 'yeast1.txt', 50)
+print infer_evolutionary_tree('yeast_gene2_seqs.phylip', 'yeast2.txt', 50)
