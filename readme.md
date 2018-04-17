@@ -17,3 +17,6 @@ Compute the RDMST (rooted directed minimum spanning tree) through edge weight mo
 
 ### 4. Sequence Alignment: 
 Uses dynamic programming to find the optimal alignment betwen two DNA sequences. Calculates the null distribution and analyzes the effects of global vs local optimality. 
+
+### 5. Evolutionary Trees
+Calculates the NNI neighbors of an evolutionary tree and uses them along with a random restart algorithm to find the optimum DNA sequence for the tree's internal nodes. Analyzes the effects of more restarts vs longer searches per restart on various types of trees. 
