@@ -20,3 +20,6 @@ Uses dynamic programming to find the optimal alignment betwen two DNA sequences.
 
 ### 5. Evolutionary Trees
 Calculates the NNI neighbors of an evolutionary tree and uses them along with a random restart algorithm to find the optimum DNA sequence for the tree's internal nodes. Analyzes the effects of more restarts vs longer searches per restart on various types of trees. 
+
+### 6. Part-of-Speech Tagging
+Implement the Viterbi algorithm to analyze sentences as a Hidden Markov Model and label words in sentence with their correct part-of-speech. Calculates tags using both bigram and trigram methods.
