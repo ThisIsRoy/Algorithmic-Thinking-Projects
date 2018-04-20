@@ -47,6 +47,7 @@ def read_pos_file(filename):
 
 #####################  STUDENT CODE BELOW THIS LINE  #####################
 training_data, unique_words, unique_tags = read_pos_file('testdata_tagged.txt')
+# raining_data, unique_words, unique_tags = read_pos_file('training.txt')
 # print 'training data', training_data
 # print 'words, ', words
 # print 'tags, ', tags
@@ -59,14 +60,14 @@ def compute_counts(training_data, order):
 	:return: the token number, word count, tag count, two tag count, three tag count
 	"""
 	data_len = len(training_data)
-	tag_word_count = dikshanary()
+	tag_word_count = defaultdict(lambda: defaultdict(float))
 	tag_count = dikshanary()
 	two_tag_count = defaultdict(lambda: defaultdict(int))
 	three_tag_count = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
 
 	for idx, tup in enumerate(training_data):
 		# Compute C(t, w)
-		tag_word_count[tup] += 1
+		tag_word_count[tup[1]][tup[0]] += 1
 
 		# Compute C(t)
 		tag_count[tup[1]] += 1
@@ -82,17 +83,17 @@ def compute_counts(training_data, order):
 			# three_tag_count[(tup[1], training_data[idx + 1][1], training_data[idx + 2][1])] += 1
 
 	if order == 2:
-		return tuple([len(training_data)]), tag_word_count, tag_count, two_tag_count
+		return len(training_data), tag_word_count, tag_count, two_tag_count
 
 	elif order == 3:
-		return tuple([len(training_data)]), tag_word_count, tag_count, two_tag_count, three_tag_count
+		return len(training_data), tag_word_count, tag_count, two_tag_count, three_tag_count
 
 	else:
 		print 'OOPSIE WOOPSIE!! Uwu We made a fucky wucky!! A wittle fucko boingo! The code monkeys at our headquarters are working VEWY HAWD to fix this!'
 
 # third order training data
-# print compute_counts(training_data, 3)
-# num_token, W, C1, C2, C3 = compute_counts(training_data, 3)
+# print compute_counts(training_data, 3)[0]
+num_token, W, C1, C2, C3 = compute_counts(training_data, 3)
 # print 'num tokens', num_token
 # print 'w', W
 # print 'C1', C1
@@ -100,7 +101,7 @@ def compute_counts(training_data, order):
 # print 'C3', C3
 
 # second order training data
-num_token, W, C1, C2 = compute_counts(training_data, 2)
+# num_token, W, C1, C2 = compute_counts(training_data, 2)
 
 
 def compute_initial_distribution(training_data, order):
@@ -126,24 +127,24 @@ def compute_initial_distribution(training_data, order):
 				pi_dict[training_data[idx + 2][1]] += 1
 				start_num += 1
 
-		# divide each count by total number of starting words
-		for word in pi_dict:
-			pi_dict[word] /= start_num
+		# divide each count by total number of starting tags
+		for tag in pi_dict:
+			pi_dict[tag] /= start_num
 
 	# compute third order HMM
 	elif order == 3:
 		pi_dict = defaultdict(lambda: dikshanary())
-		pi_dict[training_data[0][0]][training_data[1][0]] += 1
+		pi_dict[training_data[0][1]][training_data[1][1]] += 1
 
 		for idx, tup in enumerate(training_data[2:]):
 			if tup[0] == '.' and idx != data_len - 3:
-				pi_dict[training_data[idx + 2][0]][training_data[idx + 3][0]] += 1
+				pi_dict[training_data[idx + 3][1]][training_data[idx + 4][1]] += 1
 				start_num += 1
 
 		# divide each count by total number of starting words
-		for word, inner_dict in pi_dict.items():
-			for word2 in inner_dict:
-				pi_dict[word][word2] /= start_num
+		for tag in pi_dict:
+			for tag2 in pi_dict[tag]:
+				pi_dict[tag][tag2] /= start_num
 
 	return pi_dict
 
@@ -159,8 +160,8 @@ def compute_emission_probabilities(unique_words, unique_tags, W, C):
 
 	for tag in unique_tags:
 		for word in unique_words:
-			if W[(word, tag)] != 0:
-				emission[tag][word] = float(W[(word, tag)]) / C[tag]
+			if W[tag][word] != 0:
+				emission[tag][word] = float(W[tag][word]) / C[tag]
 
 	return emission
 
@@ -173,7 +174,6 @@ def compute_emission_probabilities(unique_words, unique_tags, W, C):
 
 def compute_lambdas(unique_tags, num_tokens, C1, C2, C3, order):
 	lambdas = [0.0 , 0.0 , 0.0]
-	num_tokens = num_tokens[0]
 
 	# implement lambda calculations
 	if order == 2:
@@ -218,6 +218,7 @@ def compute_lambdas(unique_tags, num_tokens, C1, C2, C3, order):
 # print compute_lambdas(unique_tags, num_token, C1, C2, C3, 3)
 # print compute_lambdas(None, num_token, C1, C2, C3, 3)
 
+
 def build_hmm(training_data, unique_tags, unique_words, order, use_smoothing):
 	if order == 2:
 		num_token, W, C1, C2 = compute_counts(training_data, order)
@@ -243,7 +244,7 @@ def build_hmm(training_data, unique_tags, unique_words, order, use_smoothing):
 		for bigram1 in C2:
 			for bigram2 in C2[bigram1]:
 				transition_matrix[bigram1][bigram2] = lambdas[1] * C2[bigram1][bigram2] / C1[bigram1] + lambdas[0] * C1[
-					bigram2] / num_token[0]
+					bigram2] / num_token
 
 
 	elif order == 3:
@@ -255,30 +256,56 @@ def build_hmm(training_data, unique_tags, unique_words, order, use_smoothing):
 					transition_matrix[trigram1][trigram2][trigram3] = lambdas[2] * C3[trigram1][trigram2][trigram3] / \
 																	  C2[trigram1][trigram2] + lambdas[1] * \
 																	  C2[trigram2][trigram3] / C1[trigram2] + lambdas[
-																		  0] * C1[trigram3] / num_token[0]
+																		  0] * C1[trigram3] / num_token
 
 	return HMM(order, initial_dist, emission_matrix, transition_matrix)
 
-test_hmm = build_hmm(training_data, unique_tags, unique_words, 2, False)
+test_hmm = build_hmm(training_data, unique_tags, unique_words, 3, False)
+# print 'transition matrix', test_hmm.transition_matrix
 
 
 def update_hmm_bigram(hmm, sentence):
-	# missing_words = numpy.setdiff1d(	)
+	# find all words in current model
 	hmm_words = set()
 	for word_dict in hmm.emission_matrix.values():
-		hmm_words.add(word_dict.keys())
+		hmm_words.update(word_dict.keys())
 
-	missing_words = numpy.setdiff1d(sentence, hmm_words)
+	# find words in sentence but not in model
+	# print 'hmm words', hmm_words
+	missing_words = set(sentence) - hmm_words
+
+	# missing_words = list()
+	# for word in sentence:
+	# 	if word not in hmm_words:
+	# 		missing_words.append(word)
+	# print 'missing words', missing_words
+
 	epsilon = 0.00001
 
+	for tag in hmm.emission_matrix:
+		for word in hmm.emission_matrix[tag]:
+			# add epsilon probability to all existing words
+			hmm.emission_matrix[tag][word] += epsilon
+
+		# add missing word to emission matrix
+		for missing_word in missing_words:
+			hmm.emission_matrix[tag][missing_word] = epsilon
+
+	# normalize probability
+	for tag in hmm.emission_matrix:
+		prob_sum = sum(hmm.emission_matrix[tag].values())
+
+		for word in hmm.emission_matrix[tag]:
+			hmm.emission_matrix[tag][word] /= prob_sum
 
 
 def bigram_viterbi(hmm, sentence):
+	update_hmm_bigram(hmm, sentence)
 	v_matrix = defaultdict(list)
 	bp_matrix = defaultdict(list)
 	z = [0 for _ in range(len(sentence))]
 	states = hmm.transition_matrix.keys()
-	print 'words', hmm.emission_matrix.values()
+	# print 'words', hmm.emission_matrix.values()
 	# print 'initial distribution', hmm.initial_distribution
 	# print 'emission matix', hmm.emission_matrix
 	# print 'states', states
@@ -295,8 +322,22 @@ def bigram_viterbi(hmm, sentence):
 	# use DP to calculate rest of words
 	for word_idx in range(1, len(sentence)):
 		for state in states:
-			prev_col = [v_matrix[state2][word_idx - 1] * hmm.transition_matrix[state2][state] for state2 in states]
-			v_matrix[state].append(hmm.emission_matrix[state][sentence[word_idx]] * max(prev_col))
+
+			# calculate all values of previous column
+			prev_col = list()
+			for state2 in states:
+				if v_matrix[state2][word_idx - 1] <= 0 or hmm.transition_matrix[state2][state] <= 0:
+					prev_col.append(-float('inf'))
+				else:
+					# print 'math log first', v_matrix[state2][word_idx - 1], math.log(v_matrix[state2][word_idx - 1])
+					# print 'math log second', hmm.transition_matrix[state2][state], math.log(hmm.transition_matrix[state2][state])
+					prev_col.append(math.log(v_matrix[state2][word_idx - 1]) + math.log(hmm.transition_matrix[state2][state]))
+			# prev_col = [math.log(v_matrix[state2][word_idx - 1]) + math.log(hmm.transition_matrix[state2][state]) for state2 in states]
+			if hmm.emission_matrix[state][sentence[word_idx]] <= 0:
+				v_matrix[state].append(-float('inf'))
+			else:
+				v_matrix[state].append(math.log(hmm.emission_matrix[state][sentence[word_idx]]) + max(prev_col))
+
 			bp_matrix[state].append(states[numpy.argmax(prev_col)])
 
 	# calculate last row of Z matrix to find state with maximum value
@@ -310,10 +351,83 @@ def bigram_viterbi(hmm, sentence):
 	return [(sentence[i], z[i]) for i in range(len(sentence))]
 
 test_sentence = ['The', 'United', 'Nationals','Security','Council', 'was', 'a', 'series','of','domestic','programs','enacted','in','the','United','States','between','1933','and','1936',',','and','a','few','that','came','later','.']
+# test_sentence = ['I', 'love', 'you']
 # test_sentence = open('testdata_untagged.txt', 'r').read().split(' ')
 # print test_sentence
-print bigram_viterbi(test_hmm, test_sentence)
+# print bigram_viterbi(test_hmm, test_sentence)
 
 
 def trigram_viterbi(hmm, sentence):
-	pass
+	v_matrix = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+	bp_matrix = defaultdict(lambda: defaultdict(lambda:  defaultdict(float)))
+	z = [0 for _ in range(len(sentence))]
+
+	# find all states
+	# states = []
+	# for tag1 in hmm.transition_matrix:
+	# 	for tag2 in hmm.transition_matrix[tag1]:
+	# 		states.append(tuple([tag1, tag2]))
+	states = hmm.emission_matrix.keys()
+
+	# print 'initial', hmm.initial_distribution
+
+	# set up initial distribution
+	for tag1 in hmm.initial_distribution:
+		for tag2 in hmm.initial_distribution[tag1]:
+			# print 'emission val', hmm.emission_matrix[tag2][sentence[1]]
+
+			# print 'tags', tag1, tag2
+			# v_matrix[tag1][tag2][0] = hmm.initial_distribution[tag1][tag2] * hmm.emission_matrix[tag2][sentence[0]]
+			if hmm.initial_distribution[tag1][tag2] <= 0 or hmm.emission_matrix[tag1][sentence[0]] <= 0 or hmm.emission_matrix[tag2][sentence[1]] <= 0:
+				v_matrix[tag1][tag2][1] = 0
+			else:
+				v_matrix[tag1][tag2][1] = math.log(hmm.initial_distribution[tag1][tag2]) + math.log(hmm.emission_matrix[tag1][sentence[0]]) + math.log(hmm.emission_matrix[tag2][sentence[1]])
+			print v_matrix[tag1][tag2][1]
+
+	# print 'v matrix current', v_matrix
+	for word_idx in range(2, len(sentence)):
+		for state in states:
+			for state2 in states:
+				prev_col = list()
+				state_p_list = list()
+
+				for state_p in states:
+					for state2_p in states:
+						state_p_list.append(state_p)
+						# print 'v matrix val', v_matrix[state_p][state2_p][word_idx - 1]
+						# print 'transition matrix val', hmm.transition_matrix[state_p][state2_p][state2]
+
+						if v_matrix[state_p][state2_p][word_idx - 1] <= 0 or hmm.transition_matrix[state_p][state2_p][state2] <= 0:
+							prev_col.append(-float('inf'))
+						else:
+							prev_col.append(math.log(v_matrix[state_p][state2_p][word_idx - 1]) + math.log(
+								hmm.transition_matrix[state_p][state2_p][state2]))
+
+				# print 'max', max(prev_col)
+
+				# multiply by maximum of previous column
+				if hmm.emission_matrix[state2][sentence[word_idx]] <= 0:
+					v_matrix[state][state2][word_idx] = -float('inf')
+				else:
+					v_matrix[state][state2][word_idx] = math.log(
+						hmm.emission_matrix[state2][sentence[word_idx]]) + max(prev_col)
+
+				# print 'argmax', state_p_list[numpy.argmax(prev_col)]
+				bp_matrix[state][state][word_idx] = state_p_list[numpy.argmax(prev_col)]
+
+	# print 'bp matrix', bp_matrix
+	return 'got here'
+	# calculate last row of Z matrix to find state with maximum value
+	v_max_key = [(key, v_matrix[key[0]][key[1]][len(sentence)]) for key in states]
+	max_state_pair = max(v_max_key, key=lambda item: item[1])[0]
+	z[-2] = max_state_pair[0]
+	z[-1] = max_state_pair[1]
+
+	# construct rest of z array
+	for index in reversed(range(len(z) - 2)):
+		print 'bp', bp_matrix[z[index + 1]][z[index + 2]][index + 1]
+		z[index] = bp_matrix[z[index + 1]][z[index + 2]][index + 1][0]
+
+	return [(sentence[i], z[i]) for i in range(len(sentence))]
+
+print trigram_viterbi(test_hmm, test_sentence)
